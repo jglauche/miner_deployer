@@ -8,8 +8,10 @@ class Deployer
 		end
 		@mode = "install"
 		@version = "gcc7.2.0"
-		@connect_to = "stratum+tcp://136.243.60.144:3333"
-	
+		
+		@connect_to = default_connect_to
+		@av = 1
+
 		opt_parser = OptionParser.new do |opts|
 			opts.on("-s","--server SERVER", "Server to deploy to") do |s|
 				@server = s
@@ -25,8 +27,16 @@ class Deployer
 			end
 			opts.on("-c","--miner-connection", "Connect miner to string; for example stratum+tcp://127.0.0.1:3333") do |c|
 				@connect_to = c			
+			end	
+			opts.on("--av","--av setting to xmrig (default 1)") do |av|
+				@av = av
 			end
-
+			# TODO: 
+			# - manual tread count
+			# - manual affinity
+			# - username/password of pool
+			# - define cryptonight/cryptolight algo
+			# - check cpu cache and calculate threads accordingly
 			opts.on("-h","--help", "This help") do |h|
 				help
 				puts opts
@@ -44,10 +54,18 @@ class Deployer
 		info
 	end
 
+	def default_connect_to
+		"stratum+tcp://136.243.60.144:3333" 
+	end
+
 	def sanity_checks
 		if @server.to_s == ""
 			return help
 		end
+		if @server == default_connect_to
+			puts "Warning: using default server, please use the -c command to use your pool"
+		end
+
 		if @mode == "install" and !File.exists?(binary_path)
 			puts "Error, expected file does not exist: #{binary_path}"
 			exit
@@ -159,6 +177,10 @@ class Deployer
 		"./xmrig_versions/#{@version}/xmrig"
 	end
 
+	def thread_count
+		@cores*@sockets
+	end
+
 	def miner_config
 		if @affinity
 			aff_str = "--cpu-affinity #{@affinity}"
@@ -167,7 +189,7 @@ class Deployer
 		end
 
 		f = File.open("miner.sh","w")
-		f.write "cd ~/xmrig\nnice -n 19 ./xmrig -o #{@connect_to} -t #{@cores*@sockets} --av 1 --nicehash #{aff_str}\n"
+		f.write "cd ~/xmrig\nnice -n 19 ./xmrig -o #{@connect_to} -t #{thread_count} --av #{@av} --nicehash #{aff_str}\n"
 		f.close
 	end
 
