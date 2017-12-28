@@ -17,37 +17,35 @@ class Deployer
 			opts.on("-s","--server SERVER", "Server to deploy to") do |s|
 				@server = s
 			end
-			opts.on("-m", "--mode", "Mode: install (default), update_config, update_miner") do |m|
+			opts.on("-m", "--mode=", "Mode: install (default), update_config, update_miner") do |m|
 				@mode = m
 			end
-			opts.on("-b", "--binary", "install this binary version (default gcc7.2.0)") do |b|
+			opts.on("-b", "--binary=", "install this binary version (default gcc7.2.0)") do |b|
 				@version = b
 			end
 			opts.on("-S","--skip-connection-checks","skips checking the SSH connection before doing things") do |s|
 				@skip_connect_check = true
 			end
-			opts.on("-c","--miner-connection", "Connect miner to pool or proxy; for example stratum+tcp://127.0.0.1:3333") do |c|
+			opts.on("-c","--miner-connection=", "Connect miner to pool or proxy; for example stratum+tcp://127.0.0.1:3333") do |c|
 				@connect_to = c			
 			end	
-			opts.on("--av","--av setting to xmrig (default 1)") do |av|
+			opts.on("--av=","--av setting to xmrig (default 1)") do |av|
 				@av = av
 			end
-			opts.on("-u","--username", "Username for pool") do |u|
+			opts.on("-u","--username=", "Username for pool") do |u|
 				@login = u
 			end
-			opts.on("-p", "--password","Password for pool") do |p|
+			opts.on("-p", "--password=","Password for pool") do |p|
 				@passsword = p
 			end
-			opts.on("-a", "--algo", "algorithm, [cryptonight, cryptonight-lite] default: cryptonight") do |a|
+			opts.on("-a", "--algo=","algorithm, [cryptonight, cryptonight-lite] default: cryptonight") do |a|
 				@algo = a
 			end
-			opts.on("-t", "--threads", "threads (leave blank for auto detect)") do |t|
+			opts.on("-t", "--threads=", "threads (leave blank for auto detect)") do |t|
 				@override_threads = t
 			end
 			# TODO: 
 			# - manual affinity
-			# - define cryptonight/cryptolight algo
-			# - check cpu cache and calculate threads accordingly
 			opts.on("-h","--help", "This help") do |h|
 				help
 				puts opts
@@ -108,7 +106,7 @@ class Deployer
 
 	def check_cpu
 		puts "Checking CPU..."
-		res = remote_query("lscpu |egrep '^Core|^Model name|^CPU\\(s\\)|^Socket'") 	
+		res = remote_query("lscpu |egrep '^Core|^Model name|^CPU\\(s\\)|^Socket|^L3'") 	
 		@cpus = nil
 		@cores = nil
 		@processor = nil
@@ -124,6 +122,8 @@ class Deployer
 				@cpus = b[1].to_i
 			elsif b[0].to_s.include? "Socket"
 				@sockets = b[1].to_i
+			elsif b[0].to_s.include? "L3"
+				@l3_cache = b[1].gsub("K","").to_i
 			else
 				puts "[debug]: #{b[0]}"
 			end
@@ -138,15 +138,15 @@ class Deployer
 		puts "found cpus: #{@cpus}"
 		puts "found sockets: #{@sockets}"
 		puts "found cores per socket: #{@cores}"
-		
+		puts "L3 cache: #{@l3_cache}"
+		puts "Configuring for algorithm #{@algo} and thread count: #{thread_count}"	
 		determine_affinity
 
 		check_processor_blacklist
 	end
 
-	def determine_affinity
-		
-		
+
+	def determine_affinity	
 		if @cpus == 1 or @cpus == @cores*@sockets
 			puts "no affinity setting needed"
 			@affinity = nil
@@ -157,6 +157,8 @@ class Deployer
 	end
 
 	def check_processor_blacklist
+		# FIXME: when testing deployment on cloud servers I'd sometimes get on really shitty ones for cryptonight mining
+		# This should be user definable. 
 		@blacklist = ["Intel(R) Xeon(R) CPU E5520"]
 		if @blacklist.include? @processor
 			puts "Processor blacklisted, aborting."	
@@ -192,7 +194,23 @@ class Deployer
 		if @override_threads
 			return @override_threads
 		end
-		@cores*@sockets
+		# check for low cache
+		if @l3_cache
+			case @algo
+			when 'cryptonight'
+				@max_threads = @l3_cache / 2048
+			when 'cryptonight-lite'
+				@max_threads = @l3_cache / 1024
+			else
+				puts "could not determine maximum number of threads"
+			end
+			if @max_threads && @max_threads < @cores*@sockets
+				return @max_threads
+			end
+		end
+	
+		# usually, use all physical cores
+		return @cores*@sockets
 	end
 
 	def miner_config
