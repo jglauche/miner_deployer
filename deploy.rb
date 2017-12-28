@@ -4,9 +4,7 @@ require "./lib/deployer"
 
 
 
-d = Deployer.new("server" => ARGV[0],
-								 "version" => ARGV[1],
-								 "mode" => "install")
+d = Deployer.new(ARGV)
 puts "deploying in 3 secs..."
 sleep 3
 d.deploy!

@@ -1,16 +1,44 @@
+require 'optparse'
+
 class Deployer
 
-	def initialize(opts={})
-		@server = opts["server"]
-		@version = opts["version"]
-		@mode = opts["install"]
-		@skip_connect_check = opts["skip_connect_check"] || false
-
+	def initialize(options={})
+		if options.size == 0
+			options = ["--help"]
+		end
+		@mode = "install"
+		@version = "gcc7.2.0"
 		@connect_to = "stratum+tcp://136.243.60.144:3333"
 	
-		if @version.to_s == ""
-			@version = "gcc7.2.0"
+		opt_parser = OptionParser.new do |opts|
+			opts.on("-s","--server SERVER", "Server to deploy to") do |s|
+				@server = s
+			end
+			opts.on("-m", "--mode", "Mode: install (default), update_config, update_miner") do |m|
+				@mode = m
+			end
+			opts.on("-b", "--binary", "install this binary version (default gcc7.2.0)") do |b|
+				@version = b
+			end
+			opts.on("-S","--skip-connection-checks","skips checking the SSH connection before doing things") do |s|
+				@skip_connect_check = true
+			end
+			opts.on("-c","--miner-connection", "Connect miner to string; for example stratum+tcp://127.0.0.1:3333") do |c|
+				@connect_to = c			
+			end
+
+			opts.on("-h","--help", "This help") do |h|
+				help
+				puts opts
+				exit
+			end
 		end
+		opt_parser.parse!(options)
+		if !@server 	
+			puts "no server defined"
+			exit
+		end
+
 		sanity_checks
 		check_cpu
 		info
@@ -29,12 +57,8 @@ class Deployer
 	end
 
 	def help
-		puts "Miner Deployer. Assumes Debian 9 system, upgrades parts to debian sid." 
-		puts "Usage: ./deploy.rb SERVER [VERSION]"
+		puts "The Miner Deployer assumes that you have a Debian 9 system, upgrades parts to debian sid." 
 		puts "assumes that you have put your public ssh key in /root/.ssh/authorized_keys"
-		puts "set up your miner.sh before running it, currently it has no automagic config"
-		puts "Warning: Will automatically reboot server after it's done"
-		exit
 	end
 
 	def info
