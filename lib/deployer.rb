@@ -11,7 +11,8 @@ class Deployer
 		
 		@connect_to = default_connect_to
 		@av = 1
-
+		@algo = "cryptonight"
+		
 		opt_parser = OptionParser.new do |opts|
 			opts.on("-s","--server SERVER", "Server to deploy to") do |s|
 				@server = s
@@ -25,16 +26,26 @@ class Deployer
 			opts.on("-S","--skip-connection-checks","skips checking the SSH connection before doing things") do |s|
 				@skip_connect_check = true
 			end
-			opts.on("-c","--miner-connection", "Connect miner to string; for example stratum+tcp://127.0.0.1:3333") do |c|
+			opts.on("-c","--miner-connection", "Connect miner to pool or proxy; for example stratum+tcp://127.0.0.1:3333") do |c|
 				@connect_to = c			
 			end	
 			opts.on("--av","--av setting to xmrig (default 1)") do |av|
 				@av = av
 			end
+			opts.on("-u","--username", "Username for pool") do |u|
+				@login = u
+			end
+			opts.on("-p", "--password","Password for pool") do |p|
+				@passsword = p
+			end
+			opts.on("-a", "--algo", "algorithm, [cryptonight, cryptonight-lite] default: cryptonight") do |a|
+				@algo = a
+			end
+			opts.on("-t", "--threads", "threads (leave blank for auto detect)") do |t|
+				@override_threads = t
+			end
 			# TODO: 
-			# - manual tread count
 			# - manual affinity
-			# - username/password of pool
 			# - define cryptonight/cryptolight algo
 			# - check cpu cache and calculate threads accordingly
 			opts.on("-h","--help", "This help") do |h|
@@ -178,18 +189,31 @@ class Deployer
 	end
 
 	def thread_count
+		if @override_threads
+			return @override_threads
+		end
 		@cores*@sockets
 	end
 
 	def miner_config
+		aff_str = ""
+		algo_str = ""
+		login_str =""
 		if @affinity
 			aff_str = "--cpu-affinity #{@affinity}"
-		else
-			aff_str = ""
+		end
+		if @algo != "cryptonight"
+			algo_str = "-a #{@algo}"
+		end
+		if @login
+			login_str ="-u #{@login} "
+		end
+		if @password
+			login_str += "-p #{@password}"
 		end
 
 		f = File.open("miner.sh","w")
-		f.write "cd ~/xmrig\nnice -n 19 ./xmrig -o #{@connect_to} -t #{thread_count} --av #{@av} --nicehash #{aff_str}\n"
+		f.write "cd ~/xmrig\nnice -n 19 ./xmrig -o #{@connect_to} #{login_str} -t #{thread_count} --av #{@av} --nicehash #{aff_str} #{algo_str}\n".split(" ").join(" ")
 		f.close
 	end
 
