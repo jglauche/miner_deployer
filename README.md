@@ -1,4 +1,4 @@
-= Miner deployer
+# Miner deployer
 
 This is experimental software to deploy cpu miners for cryptonight and cryptolight coins on servers within a minute.
 
