@@ -231,7 +231,7 @@ class Deployer
 		end
 
 		f = File.open("miner.sh","w")
-		f.write "cd ~/xmrig\nnice -n 19 ./xmrig -o #{@connect_to} #{login_str} -t #{thread_count} --av #{@av} --nicehash #{aff_str} #{algo_str}\n".split(" ").join(" ")
+		f.write "cd ~/xmrig && nice -n 19 ./xmrig -o #{@connect_to} #{login_str} -t #{thread_count} --av #{@av} --nicehash #{aff_str} #{algo_str}\n".split(" ").join(" ")
 		f.close
 	end
 
